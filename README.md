@@ -1,5 +1,5 @@
 # Developer Portal
-
+ 
 This project stores the files for the [Espressif Developer Portal][] website. GitHub Actions statically generate the website using Hugo and pushes it to a web server for online hosting.
 
 [Espressif Developer Portal]: https://developer.espressif.com/
