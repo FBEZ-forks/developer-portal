@@ -12,7 +12,7 @@ cascade:
 
 ## Featured Articles
 
-{{< article link="/blog/reliability-esp-now/" >}}
+{{< article link="/blog/2025/02/introducing-esp-lowcode-matter/" >}}
 
 <br>
 {{< button href="blog/" target="_self" >}}
