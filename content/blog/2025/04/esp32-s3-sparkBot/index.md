@@ -1,6 +1,6 @@
 ---
 title: "ESP-SparkBot：Large Language Model Robot with ESP32-S3"
-date: 2025-04-07T15:47:17+08:00
+date: 2025-04-23
 showAuthor: false
 featuredAsset: "ESP-SparkBot-featured.webp"
 authors:
