@@ -10,6 +10,7 @@ summary: "This articles shows which cores have the FPU and what does it mean in 
 #  - Add your personal data at `data/authors/<author-name>.json`
 #  - Add author name(s) below
 authors:
+  - "alberto-spagnolo" # same as in the file paths above
   - "francesco-bez" # same as in the file paths above
 # Add tags
 tags: ["ESP32-C3", "ESP32-S3","performance", "FPU"]
