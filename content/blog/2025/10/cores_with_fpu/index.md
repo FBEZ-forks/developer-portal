@@ -130,14 +130,235 @@ With an FPU, these operations can be executed directly as hardware instructions,
 
 ## What is an FPU
 
+A **Floating Point Unit (FPU)** is a specialized part of a processor designed to handle **floating-point arithmetic directly in hardware**. While any CPU can perform floating-point calculations using software routines—like the ones implemented in newlibc on the ESP32-C3—an FPU executes these operations **much faster** by providing dedicated instructions for addition, subtraction, multiplication, division, and sometimes more advanced functions such as square roots or trigonometry.
+
+The main advantage of an FPU is **speed**. Floating-point arithmetic in software requires multiple integer operations to manipulate the sign, exponent, and mantissa of a number, whereas an FPU can produce the same result in a single instruction. This difference becomes especially significant in applications that involve **lots of numerical computation**, such as digital signal processing, machine learning, or 3D graphics.
+
+#### Single vs. Double Precision
+
+Floating-point numbers come in different levels of precision, which FPUs can handle:
+
+* **Single Precision (32-bit float):**
+  Uses 1 bit for the sign, 8 bits for the exponent, and 23 bits for the mantissa. It provides about **7 decimal digits of precision** and is commonly used in embedded applications due to its lower memory footprint and faster computation.
+
+* **Double Precision (64-bit float):**
+  Uses 1 bit for the sign, 11 bits for the exponent, and 52 bits for the mantissa. It offers about **15–16 decimal digits of precision** but requires more memory and cycles to compute. Double precision is useful when high numerical accuracy is critical, such as in scientific calculations or precise control systems.
+
+By including an FPU, a processor can execute both single and double-precision operations natively, delivering a **dramatic performance boost** over software-emulated arithmetic. For cores without an FPU, like the ESP32-C3, libraries like newlibc emulate these operations in software, ensuring correctness but at a significant speed cost.
+
+With a clear understanding of what an FPU does and why it matters, the next step is to see which Espressif cores actually include hardware FPUs and what types of floating-point precision they support.
+
 ### Which cores have an FPU
+
+Since an FPU is not strictly required for a processor to function, not all Espressif cores include one. If you want a quick overview, Espressif provides a concise [SoC Product Portfolio](https://products.espressif.com/static/Espressif%20SoC%20Product%20Portfolio.pdf) that highlights the key features of each chip, including whether an FPU is present.
+
+In practice, FPUs are found in the cores designed for higher computational workloads, where fast floating-point arithmetic makes a tangible difference. These include the **ESP32, ESP32-S3, ESP32-H4, and ESP32-P4**.
+
+All of these cores feature a **single-precision FPU**, which is sufficient for typical embedded applications, digital signal processing, and lightweight machine learning tasks. 
+
+
+| Core      | FPU |
+| --------- | --- |
+| ESP32     | X   |
+| ESP32-S2  |     |
+| ESP32-S3  | X   |
+| ESP32-C2  |     |
+| ESP32-C3  |     |
+| ESP32-C5  |     |
+| ESP32-C6  |     |
+| ESP32-C61 |     |
+| ESP32-H2  |     |
+| ESP32-H4  | X   |
+| ESP32-P4  | X   |
+
+
+To put the impact of an FPU into perspective, the following benchmark compares the execution of the same floating-point workload on two Espressif cores—one with a hardware FPU and one without—highlighting the dramatic difference in speed and efficiency.
 
 ### Benchmark
 
+To measure the performance improvement, we will measure the average cycle number required by a core with FPU and one without FPU to do the following functions
+* `float_sum10`, `double_sum10`: adding 10 to given number
+* `float_div10`, `double_div10`: dividing the number by 10
+* `cosf`, `cos`: performing the cosine of the number 
+* `float_mixed`, `double_mixed`: performing a complex calculation with division and trigonometry `cos(sqrtf(value / 2.3 * 0.5 / value))`
+
+Each function is performed 10000 times in a loop and the total number of cycles is divided by 10000. 
+
+<details>
+<summary>Full benchmark code </summary>
+
+```c
+#include <stdio.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <math.h>
+
+#include <esp_cpu.h>
+#include <esp_system.h>
+#include <esp_chip_info.h>
+#include <esp_random.h>
+#include <esp_log.h>
+
+#define TAG         "test"
+#define ITERATIONS  10000
+
+static void float_test(const char* label, float seed, float (*function) (float))
+{
+    uint32_t start_cycles = esp_cpu_get_cycle_count();
+    for (uint32_t i = 0; i < ITERATIONS; i++)
+    {
+        seed = function(seed);
+    }
+    uint32_t end_cycles = esp_cpu_get_cycle_count();
+
+    printf(TAG ": %s %-10.10s average %"PRIu32 " cycles\n",label,  "float:", (end_cycles - start_cycles) / ITERATIONS);
+}
+
+static void double_test(const char* label, double seed, double (*function) (double))
+{
+    uint32_t start_cycles = esp_cpu_get_cycle_count();
+    for (uint32_t i = 0; i < ITERATIONS; i++)
+    {
+        seed = function(seed);
+    }
+    uint32_t end_cycles = esp_cpu_get_cycle_count();
+
+    printf(TAG ": %s %-10.10s average %"PRIu32 " cycles\n", label, "double:", (end_cycles - start_cycles) / ITERATIONS);
+}
+
+typedef struct {
+    float (*float_function) (float);
+    double (*double_function) (double);
+} test_t;
+
+static void test(const char* label, test_t* test) {
+    printf(TAG ": %s\n", label);
+
+    double seed = 123456.789;
+
+    if (test->float_function != NULL) {
+        float_test(label, (float) seed, test->float_function);
+    }
+
+    if (test->double_function != NULL) {
+        double_test(label, (double) seed, test->double_function);
+    }
+
+    printf("\n");
+}
+
+/*** trivial functions ***/
+static float float_sum10(float value) {
+    return (value + 10);
+}
+
+static double double_sum10(double value) {
+    return (value + 10);
+}
+
+static float float_div10(float value) {
+    return (value / 10);
+}
+
+static double double_div10(double value) {
+    return (value / 10);
+}
+
+/*
+ * mixed calculations
+ */
+static float float_mixed(float value) {
+    return cosf(sqrtf(value / 2.3f * 0.5f / value));
+}
+
+static double double_mixed(double value) {
+    return cos(sqrt(value / 2.3 * 0.5 / value));
+}
+
+void app_main(void)
+{
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+
+    const char *model;
+    switch (chip_info.model) {
+        case CHIP_ESP32:
+            model = "ESP32";
+            break;
+        case CHIP_ESP32S2:
+            model = "ESP32-S2";
+            break;
+        case CHIP_ESP32S3:
+            model = "ESP32-S3";
+            break;
+        case CHIP_ESP32C3:
+            model = "ESP32-C3";
+            break;
+        case CHIP_ESP32H2:
+            model = "ESP32-H2";
+            break;
+        case CHIP_ESP32C2:
+            model = "ESP32-C2";
+            break;
+        case CHIP_ESP32C6:
+            model = "ESP32-C6";
+            break;
+        default:
+            model = "<UNKNOWN>";
+            break;
+    }
+    printf("\n");
+    printf(TAG ": CHIP: %s\n", model);
+    printf("\n");
+
+    test_t sum10 = {
+        .float_function =   float_sum10,
+        .double_function =  double_sum10,
+    };
+    test("SUM", &sum10);
+
+    test_t div10 = {
+        .float_function =   float_div10,
+        .double_function =  double_div10,
+    };
+    test("DIV", &div10);
+
+    test_t cosine = {
+        .float_function =   cosf,
+        .double_function =  cos,
+    };
+    test("COS", &cosine);
+
+    test_t mixed = {
+        .float_function =   float_mixed,
+        .double_function =  double_mixed,
+    };
+    test("MIX", &mixed);
+}
+```
+
+</details>
+
+The results are collected in the following table. 
+
+|          |      SUM      |            |      DIV      |            |      COS      |            |      MIX      |            |
+|----------|---------------|------------|---------------|------------|---------------|------------|---------------|------------|
+|          | float         | double     | float         | double     | float         | double     | float         | double     |
+| ESP32C3  | 100           | 122        | 102           | 133        | 2377          | 3560       | 3659          | 6074       |
+| ESP32S3  | 25            | 70         | 69            | 75         | 121           | 1619       | 312           | 3886       |
+| Delta cycles | -75       | -52        | -33           | -58        | -2256         | -1941      | -3347         | -2188      |
+| Saving   | 75%           | 43%        | 32%           | 44%        | 95%           | 55%        | 91%           | 36%        |
+
+
+As expected, single precision float calculation show the biggest saving in machine cycles, with a peak of 95% reached with the cosine function.
+This means that if your application requires intense vector math, an FPU can come quite handy. 
+
 ## Conclusion
 
+In this article, we explored floating-point numbers, how CPUs perform these calculations with and without an FPU, and which Espressif cores include one. Benchmarks showed that cores with an FPU executed operations, especially single-precision, much faster, demonstrating the clear performance advantage of hardware FPUs for computation heavy applications.
 
 
+<!-- 
 
 ## Averaged cycles
 
@@ -196,12 +417,3 @@ ESP32S3
 | INT    | 0.08               | 0.10                    |
 
 
-## Mix
-
-|          |      SUM      |            |      DIV      |            |      COS      |            |      MIX      |            |
-|----------|---------------|------------|---------------|------------|---------------|------------|---------------|------------|
-|          | float         | double     | float         | double     | float         | double     | float         | double     |
-| ESP32C3  | 100           | 122        | 102           | 133        | 2377          | 3560       | 3659          | 6074       |
-| ESP32S3  | 25            | 70         | 69            | 75         | 121           | 1619       | 312           | 3886       |
-| Delta cycles | -75       | -52        | -33           | -58        | -2256         | -1941      | -3347         | -2188      |
-| Saving   | 75%           | 43%        | 32%           | 44%        | 95%           | 55%        | 91%           | 36%        |
