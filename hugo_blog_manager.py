@@ -58,7 +58,7 @@ def refresh_authors(default_author="espressif"):
 # --- Article Function ---
 def create_article(title, author_name):
     if not title or not author_name:
-        return "❌ Please provide both title and author."
+        return "❌ Please provide both title and author.", gr.update(), gr.update(visible=False), gr.update(visible=False)
     
     now = datetime.now()
     y, m = now.strftime("%Y"), now.strftime("%m")
@@ -66,14 +66,73 @@ def create_article(title, author_name):
     article_dir = CONTENT_BLOG_PATH / y / m / article_slug
     article_dir.mkdir(parents=True, exist_ok=True)
     
+    # Format date as YYYY-MM-DD only
+    date_only = now.strftime("%Y-%m-%d")
+    
     (article_dir / "index.md").write_text(f"""---
 title: "{title}"
 author: {author_name}
-date: {now.isoformat()}
+date: {date_only}
 ---
 """)
     vscode_link = f"{CODE_SERVER_BASE}?folder=/project/content/blog/{y}/{m}/{article_slug}"
-    return f"✅ Article '{title}' created by {author_name}.\n\n[👉 Open in VS Code]({vscode_link})"
+    preview_link = f"http://localhost:1313/blog/{y}/{m}/{article_slug}/"
+    
+    # Generate branch name
+    branch_name = f"add/{article_slug}"
+    
+    # Return separate status message and VS Code link with styling
+    status_msg = f"✅ Article '{title}' created by {author_name}."
+    
+    # Create styled link with chain emoji - red theme
+    vscode_msg = f"""
+    <div style="
+        background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 2px solid #742a2a;
+    ">
+        <a href="{vscode_link}" target="_blank" style="
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        ">
+            🔗 Open in VS Code
+        </a>
+    </div>
+    """
+    
+    # Create styled preview link - orange theme
+    preview_msg = f"""
+    <div style="
+        background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 2px solid #c05621;
+    ">
+        <a href="{preview_link}" target="_blank" style="
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        ">
+            👁️ Preview Article
+        </a>
+    </div>
+    """
+    
+    return status_msg, gr.update(value=branch_name), vscode_msg, preview_msg
 
 # --- Git Functions ---
 def fork_repo(pat):
@@ -127,28 +186,76 @@ def push_changes(branch_name, pat):
         return f"❌ Push failed: {str(e)}"
 
 # --- Gradio UI ---
-with gr.Blocks(title="Hugo Blog Manager") as demo:
-    gr.Markdown("# 🚀 Hugo Blog Manager")
+with gr.Blocks(title="Developer portal article manager", css="""
+    .vscode-link-container {
+        margin: 10px 0;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 2px solid #742a2a;
+    }
+    .vscode-link {
+        color: white !important;
+        text-decoration: none !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    .vscode-link:hover {
+        color: #fed7d7 !important;
+        text-decoration: underline !important;
+    }
+    .preview-link-container {
+        margin: 10px 0;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 2px solid #c05621;
+    }
+    .preview-link {
+        color: white !important;
+        text-decoration: none !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    .preview-link:hover {
+        color: #feebc8 !important;
+        text-decoration: underline !important;
+    }
+""") as demo:
+    gr.Markdown("# 🚀 Developer portal article manager")
     
     # Status outputs
     author_status = gr.Markdown()
     article_output = gr.Markdown()
     git_output = gr.Markdown()
     
-    # Author Section
-    with gr.Row():
-        with gr.Column(scale=2):
-            new_author_tb = gr.Textbox(label="New Author Name", placeholder="New author...")
-            create_author_btn = gr.Button("➕ Create Author", variant="primary")
-        with gr.Column(scale=1):
-            refresh_btn = gr.Button("🔄 Refresh", variant="secondary")
-    
+    # Author dropdown (outside accordion)
     existing_author_dd = gr.Dropdown(label="Select Author", choices=[], interactive=True)
+    
+    # New Author Section - in an accordion
+    with gr.Accordion("New Author", open=False) as new_author_accordion:
+        with gr.Row():
+            with gr.Column(scale=2):
+                new_author_tb = gr.Textbox(label="New Author Name", placeholder="New author...")
+                create_author_btn = gr.Button("➕ Create Author", variant="primary")
+            with gr.Column(scale=1):
+                refresh_btn = gr.Button("🔄 Refresh", variant="secondary")
     
     # Article Section
     with gr.Row():
         article_title_tb = gr.Textbox(label="Article Title", placeholder="My first post...")
-        create_article_btn = gr.Button("📝 Create Article", variant="primary")
+        with gr.Column():
+            create_article_btn = gr.Button("📝 Create Article", variant="stop")
+            vscode_link_output = gr.HTML()
+            preview_link_output = gr.HTML()
     
     # Git Section
     with gr.Accordion("Git Operations", open=False):
@@ -178,7 +285,7 @@ with gr.Blocks(title="Hugo Blog Manager") as demo:
     create_article_btn.click(
         create_article, 
         inputs=[article_title_tb, existing_author_dd], 
-        outputs=[article_output]
+        outputs=[article_output, branch_tb, vscode_link_output, preview_link_output]
     )
 
     # ✅ Populate dropdown at startup
