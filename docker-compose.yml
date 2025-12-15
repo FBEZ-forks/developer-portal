@@ -1,0 +1,26 @@
+services:
+  hugo:
+    image: ghcr.io/gohugoio/hugo:v0.144.1
+    container_name: hugo
+    volumes:
+      - .:/project
+    working_dir: /project
+    ports:
+      - "1313:1313"
+    entrypoint: ["hugo"]
+    command: server --bind 0.0.0.0 --baseURL http://localhost --appendPort=false --watch
+
+  vscode:
+    image: codercom/code-server:4.106.3-39
+    container_name: code-server
+    volumes:
+      - .:/project
+    working_dir: /project
+    ports:
+      - "8087:8080"
+    command: ["code-server", "--auth", "none", "--bind-addr", "0.0.0.0:8080", "/project"]
+    environment:
+      - CODE_SERVER_TRUSTED=1
+      - DISABLE_WORKSPACE_TRUST=true
+    tty: true
+
