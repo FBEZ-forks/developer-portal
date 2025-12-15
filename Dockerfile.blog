@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+
+WORKDIR /project
+
+# Install dependencies and git
+RUN apt-get update && \
+    apt-get install -y git && \
+    pip install --no-cache-dir gradio PyGithub GitPython python-slugify && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy the app
+COPY hugo_blog_manager.py /project/hugo_blog_manager.py
+
+CMD ["python", "hugo_blog_manager.py"]

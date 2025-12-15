@@ -24,3 +24,16 @@ services:
       - DISABLE_WORKSPACE_TRUST=true
     tty: true
 
+  blog-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: blog-manager
+    volumes:
+      - ./hugo_blog_manager.py:/project/hugo_blog_manager.py  # Mount script
+      - .:/project  # Optional: mount whole project if needed
+    ports:
+      - "7860:7860"
+    environment:
+      - CODE_SERVER_URL=http://localhost:8087
+    tty: true
