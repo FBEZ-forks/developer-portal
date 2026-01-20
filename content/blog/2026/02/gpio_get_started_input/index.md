@@ -1,5 +1,5 @@
 ---
-title: "Gpio_get_started_input"
+title: "ESP-IDF Series: GPIO get started - Part 2"
 date: "2026-01-19"
 # If default Espressif author is needed, uncomment this
 # showAuthor: true
@@ -10,7 +10,9 @@ summary: "Replace it with a brief summary that captures the essence of (1) what 
 #  - Add your personal data at `data/authors/<author-name>.json`
 #  - Add author name(s) below
 authors:
-  - "author-name" # same as in the file paths above
+  - "francesco-bez" # same as in the file paths above
 # Add tags
-tags: ["Tag1", "Tag2"]
+tags: ["GPIO", "Espressif", "basic"]
 ---
+
+
